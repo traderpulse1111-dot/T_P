@@ -1,0 +1,52 @@
+name: Add Testimonial
+
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: 'User Name (no spaces)'
+        required: true
+      image_url:
+        description: 'Public image URL'
+        required: true
+      video_url:
+        description: 'Public video URL'
+        required: true
+      testimonial_text:
+        description: 'Testimonial text'
+        required: true
+
+jobs:
+  add-testimonial:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set filenames
+        run: |
+          USERNAME=${{ github.event.inputs.name }}
+          EXT_IMG="${{ github.event.inputs.image_url##*. }}"
+          EXT_VIDEO="${{ github.event.inputs.video_url##*. }}"
+          IMAGE_FILE="${USERNAME}_image.${EXT_IMG}"
+          VIDEO_FILE="${USERNAME}_video.${EXT_VIDEO}"
+          echo "IMAGE_FILE=$IMAGE_FILE" >> $GITHUB_ENV
+          echo "VIDEO_FILE=$VIDEO_FILE" >> $GITHUB_ENV
+
+      - name: Download files
+        run: |
+          wget -O testimonials/${IMAGE_FILE} ${{ github.event.inputs.image_url }}
+          wget -O testimonials/${VIDEO_FILE} ${{ github.event.inputs.video_url }}
+
+      - name: Save JSON
+        run: |
+          echo '[{"name":"${{ github.event.inputs.name }}","image":"${IMAGE_FILE}","video":"${VIDEO_FILE}","testimonial":"${{ github.event.inputs.testimonial_text }}"}]' > testimonials/${USERNAME}_testimonial.json
+
+      - name: Commit changes
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add testimonials/*
+          git commit -m "Add testimonial ${{ github.event.inputs.name }}"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
