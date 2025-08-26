@@ -1,0 +1,61 @@
+name: Generate Testimonials JSON
+
+on:
+  push:
+    paths:
+      - 'testimonials/**'   # Trigger only when files in the testimonials folder are added/modified
+
+jobs:
+  generate-json:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Generate JSON
+        run: |
+          cd testimonials
+          # Remove spaces from filenames for safety
+          rename 's/ /_/g' *
+          
+          echo "[]" > ../testimonials.json
+          
+          files=$(ls *.txt)
+          
+          json="[]"
+          
+          for file in $files; do
+            base=$(basename "$file" .txt)
+            name=$(echo "$base" | sed 's/_/ /g' | cut -d' ' -f2-)
+            image_file="${base}.JPG"
+            video_file="${base}.mp4"
+            
+            # Construct JSON object
+            obj=$(jq -n \
+              --arg name "$name" \
+              --arg image "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/testimonials/$image_file" \
+              --arg video "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/testimonials/$video_file" \
+              --arg testimonial "https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/testimonials/$file" \
+              '{name: $name, image: $image, video: $video, testimonial: $testimonial}')
+            
+            # Append to JSON array
+            json=$(echo $json | jq ". += [$obj]")
+          done
+          
+          echo $json > ../testimonials.json
+
+      - name: Commit & Push JSON
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add testimonials.json
+          git commit -m "Auto-update testimonials.json"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
